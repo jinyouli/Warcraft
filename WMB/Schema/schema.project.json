@@ -1,0 +1,480 @@
+{
+    "$schema": "http://json-schema.org/draft-07/schema#",
+    "title": "project",
+    "description": "GPS项目根文件定义了项目元数据，主要是路线组。",
+    "definitions": {
+        "conditions": {
+            "type": ["object", "null"],
+            "properties": {
+                "type": {
+                    "description": "比较表达式的组合方式，包括“and”和“or”。",
+                    "type": "string",
+                    "enum": [
+                        "and",
+                        "or"
+                    ]
+                },
+                "value": {
+                    "description": "实际的比较表达式组。",
+                    "type": "array",
+                    "items": {
+                        "description": "代表单一的比较表达式，形如：<variable><operator><value>，产生一个boolean值。",
+                        "type": ["object", "null"],
+                        "properties": {
+                            "variable": {
+                                "description": "作为比较左值的预定义变量，详见GPS词汇表。",
+                                "type": "string"
+                            },
+                            "operator": {
+                                "description": "比较运算符。",
+                                "type": "string",
+                                "enum": [
+                                    ">",
+                                    ">=",
+                                    "<",
+                                    "<=",
+                                    "=",
+                                    "==",
+                                    "~="
+                                ]
+                            },
+                            "value": {
+                                "description": "作为比较右值的常量。"
+                            }
+                        },
+                        "required": [
+                            "variable",
+                            "operator",
+                            "value"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "type",
+                "value"
+            ]
+        },
+        "range_items": {
+            "type": ["object", "null"],
+            "properties": {
+                "level_max": {
+                    "description": "目标最高等级。",
+                    "type": ["integer", "null"]
+                },
+                "level_min": {
+                    "description": "目标最低等级。",
+                    "type": ["integer", "null"]
+                },
+                "range": {
+                    "description": "在当前路线周围搜索单位和物件的范围码数。",
+                    "type": "number"
+                },
+                "whitelist": {
+                    "description": "仅能作为目标的ID白名单。",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "blacklist": {
+                    "description": "不能作为目标的ID黑名单。",
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "conditions": {
+                    "description": "在选定的单位和物件上执行该动作的前提条件。",
+                    "$ref": "#/definitions/conditions"
+                }
+            }
+        },
+        "distance": {
+            "type": ["object", "boolean", "null"],
+            "required": ["default"],
+            "properties": {
+                "default": {
+                    "description": "未指定职业的默认距离码数。",
+                    "type": "number",
+                    "minimum": 0
+                }
+            }
+        },
+        "arrival_deviation": {
+            "type": ["number", "boolean", "null"],
+            "description": "这是一个通用属性。当角色前往一个导航点时，系统会产生一个随机距离码数，而该属性则定义了其最大取值范围。当角色距离导航点小于这个随机值时，则判定为抵达。\n注意：设置一个较大的该属性值会使得角色提前抵达导航点，从而使得多次运行同一条路线的实际轨迹尽可能随机；但是与此同时，角色容易偏离预定路线，如果地形复杂则容易造成卡位。"
+        },
+        "arrival_tolerance": {
+            "type": ["number", "boolean", "null"],
+            "description": "这是一个通用属性。当角色距离一个导航点的码数小于该值时，则判定为抵达。\n注意：常规无需设置这个属性，系统会根据角色移动速度自动计算。"
+        },
+        "arrival_tolerance_for_path_finding": {
+            "type": ["number", "boolean", "null"],
+            "description": "这是一个通用属性。当角色距离一个寻路时产生的内部导航点的码数小于该值时，则判定为抵达。\n注意：常规无需设置这个属性，系统会根据角色移动速度自动计算。"
+        },
+        "climb_angle": {
+            "type": ["number", "boolean", "null"],
+            "description": "这是一个通用属性，定义前往一个导航点时的角色最大可攀爬角度（45°到90°之间）。\n注意：如果不设置，则采用游戏默认值，即45。",
+            "minimum": 45,
+            "maximum": 90
+        },
+        "is_direct": {
+            "type": ["boolean", "null"],
+            "description": "这是一个通用属性，定义前往一个导航点时是否采用直线前进，而不是动态寻路。\n注意：如果不设置，则被系统认为是false。"
+        },
+        "is_portal": {
+            "type": ["boolean", "null"],
+            "description": "这是一个通用属性，表明一个导航点是否位于传送点上或者传送门内部。\n注意：如果一条路线涉及到传送，则需要标记一个点作为传送点。这使得当角色前往该点的过程中，如果发生了瞬间移动，则系统会根据角色距离该点的下一个点的距离是否已小于到该传送点的距离，从而判定为抵达。\n注意：如果不设置，则被系统认为是false。"
+        },
+        "is_simulated_turn_enabled": {
+            "type": ["boolean", "null"],
+            "description": "这是一个通用属性，定义在前往该点的过程中的所有转向动作是否采用键盘AD风格，即渐变式转向，而不是瞬间转向。\n注意：如果不设置，则被系统认为是false。"
+        },
+        "stop_before_simulated_turn": {
+            "type": ["boolean", "null"],
+            "description": "这是一个通用属性。当is_simulated_turn_enabled启用时，定义角色是否先停止移动，再进行转向，以保证移动轨迹的绝对精准。\n注意：如果不设置，则被系统认为是false。"
+        },
+        "unstuck_mode": {
+            "type": ["number", "boolean", "null"],
+            "description": "这是一个通用属性，定义了解卡模式。"
+        },
+        "jump": {
+            "type": ["number", "boolean"],
+            "description": "这是一个通用属性，定义在前往一个导航点时进行随机跳跃的概率（0~1）。\n注意：如果不设置，则被系统认为是0。",
+            "maximum": 1
+        },
+        "pve": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时进行PvE。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "type": ["object", "null"],
+                "properties": {
+                    "distance_min": {
+                        "description": "与PvE目标进行交战的最小距离码数。当角色距离目标的距离小于该值时，就停止移动。\n注意：如果不设置，则交由用户面板参数指定。",
+                        "$ref": "#/definitions/distance"
+                    },
+                    "distance_max": {
+                        "description": "与PvE目标进行交战的最大距离码数。当角色距离目标的距离大于该值时，则开始向目标移动。\n注意：如果不设置，则交由用户面板参数指定。",
+                        "$ref": "#/definitions/distance"
+                    },
+                    "attacks": {
+                        "description": "定义进行主动攻击。\n注意：如果不设置，则角色不进行主动攻击。",
+                        "type": "array",
+                        "items": {
+                            "$ref": "#/definitions/range_items"
+                        }
+                    },
+                    "defense": {
+                        "description": "定义进行被动防御。\n注意：如果不设置，则角色不进行被动防御。",
+                        "type": ["object", "null"],
+                        "properties": {
+                            "range": {
+                                "description": "搜索正在攻击角色的目标的范围码数。",
+                                "type": "number"
+                            }
+                        }
+                    }
+                }
+            }]
+        },
+        "loot": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时拾取尸体掉落。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "$ref": "#/definitions/range_items"
+            }]
+        },
+        "skin": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时进行剥皮。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "$ref": "#/definitions/range_items"
+            }]
+        },
+        "herb": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时进行采药。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "$ref": "#/definitions/range_items"
+            }]
+        },
+        "mine": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时进行采矿。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "$ref": "#/definitions/range_items"
+            }]
+        },
+        "treasure": {
+            "description": "这是一个通用属性，定义是否以及如何在前往一个导航点时开启没有上锁的宝箱。\n注意：启用需要使用object类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "$ref": "#/definitions/range_items"
+            }]
+        },
+        "harvests": {
+            "description": "这是一个通用属性，定义一组是否以及如何在前往一个导航点时搜索可以指定的世界物件并进行开启的动作逻辑。\n注意：系统会自上而下依次检查每一个harvest逻辑，一旦满足，则进行拾取。\n注意：启用需要使用array类型，禁用需要使用false。如果不设置，则被系统认为是false。",
+            "anyOf": [{
+                "type": "boolean"
+            }, {
+                "type": "array",
+                "items": {
+                    "type": ["object", "null"],
+                    "properties": {
+                        "range": {
+                            "description": "搜索可拾取的世界物件的范围码数。",
+                            "type": "number"
+                        },
+                        "models": {
+                            "type": "array",
+                            "items": {
+                                "description": "可拾取世界物件的ID集合。",
+                                "type": "integer"
+                            }
+                        },
+                        "conditions": {
+                            "description": "搜索可拾取的世界物件的前提条件。",
+                            "$ref": "#/definitions/conditions"
+                        }
+                    }
+                }
+            }]
+        },
+        "death": {
+            "description": "这是一个通用属性，定义了角色死后的行为。",
+            "type": ["object", "boolean", "null"],
+            "required": ["revive_on_spot", "retrieve_corpse"],
+            "properties": {
+                "revive_on_spot": {
+                    "description": "是否如果原地复活可用时则进行原地复活，例如已被灵魂石绑定。",
+                    "type": "boolean"
+                },
+                "retrieve_corpse": {
+                    "description": "是否当原地复活不可用时进行跑尸。",
+                    "type": "boolean"
+                },
+                "corpse_path": {
+                    "description": "跑尸所用的路线。\n注意：如果不指定跑尸路线，系统则会直接从墓地寻路前往尸体，但这有可能因为距离过远而造成卡位。",
+                    "type": ["string", "null"]
+                }
+            }
+        },
+        "early_termination": {
+            "description": "这是一个通用属性。当角色抵达一个导航点时，会检查其条件，由此决定是否将当前导航点作为路线的最后一个导航点，从而立刻结束当前路线。",
+            "type": ["object", "boolean", "null"],
+            "properties": {
+                "conditions": {
+                    "$ref": "#/definitions/conditions"
+                }
+            }
+        },
+        "point": {
+            "type": ["object", "null"],
+            "properties": {
+                "arrival_deviation": {
+                    "$ref": "#/definitions/arrival_deviation"
+                },
+                "arrival_tolerance": {
+                    "$ref": "#/definitions/arrival_tolerance"
+                },
+                "arrival_tolerance_for_path_finding": {
+                    "$ref": "#/definitions/arrival_tolerance_for_path_finding"
+                },
+                "climb_angle": {
+                    "$ref": "#/definitions/climb_angle"
+                },
+                "is_direct": {
+                    "$ref": "#/definitions/is_direct"
+                },
+                "is_portal": {
+                    "$ref": "#/definitions/is_portal"
+                },
+                "jump": {
+                    "$ref": "#/definitions/jump"
+                },
+                "pve": {
+                    "$ref": "#/definitions/pve"
+                },
+                "loot": {
+                    "$ref": "#/definitions/loot"
+                },
+                "skin": {
+                    "$ref": "#/definitions/skin"
+                },
+                "herb": {
+                    "$ref": "#/definitions/herb"
+                },
+                "mine": {
+                    "$ref": "#/definitions/mine"
+                },
+                "treasure": {
+                    "$ref": "#/definitions/treasure"
+                },
+                "harvests": {
+                    "$ref": "#/definitions/harvests"
+                },
+                "death": {
+                    "$ref": "#/definitions/death"
+                },
+                "name": {
+                    "description": "可以给导航点赋予一个名字，在显示路线时可见。",
+                    "type": "string"
+                },
+                "value": {
+                    "description": "导航点的3D坐标值。",
+                    "type": "array",
+                    "minItems": 3,
+                    "maxItems": 3,
+                    "items": {
+                        "type": "number"
+                    }
+                },
+                "actions": {
+                    "description": "可以给导航点定义一组动作序列，当角色抵达该导航点时依次运行。\n注意：只有当动作序列不存在或者全部执行完毕后，角色才会前往下一个导航点。",
+                    "type": "array",
+                    "items": {
+                        "type": ["object", "null"],
+                        "properties": {
+                            "type": {
+                                "description": "导航点动作的类型，详见GPS词汇表。",
+                                "type": "string"
+                            },
+                            "value": {
+                                "description": "导航点动作的参数，对于不同类型动作的参数详见GPS词汇表。"
+                            },
+                            "conditions": {
+                                "description": "判断导航点动作是否执行完毕的条件。",
+                                "$ref": "#/definitions/conditions"
+                            }
+                        },
+                        "required": [
+                            "type"
+                        ]
+                    }
+                }
+            },
+            "required": [
+                "value"
+            ]
+        }
+    },
+    "type": ["object", "null"],
+    "required": [
+        "path_groups"
+    ],
+    "properties": {
+        "path_groups": {
+            "description": "包含一组路线组，从而构成项目的主线逻辑。",
+            "type": "array",
+            "items": {
+                "type": ["object", "null"],
+                "required": ["name", "value", "rendezvous"],
+                "properties": {
+                    "arrival_deviation": {
+                        "$ref": "#/definitions/arrival_deviation"
+                    },
+                    "arrival_tolerance": {
+                        "$ref": "#/definitions/arrival_tolerance"
+                    },
+                    "arrival_tolerance_for_path_finding": {
+                        "$ref": "#/definitions/arrival_tolerance_for_path_finding"
+                    },
+                    "climb_angle": {
+                        "$ref": "#/definitions/climb_angle"
+                    },
+                    "is_direct": {
+                        "$ref": "#/definitions/is_direct"
+                    },
+                    "is_portal": {
+                        "$ref": "#/definitions/is_portal"
+                    },
+                    "is_simulated_turn_enabled": {
+                        "$ref": "#/definitions/is_simulated_turn_enabled"
+                    },
+                    "stop_before_simulated_turn": {
+                        "$ref": "#/definitions/stop_before_simulated_turn"
+                    },
+                    "jump": {
+                        "$ref": "#/definitions/jump"
+                    },
+                    "pve": {
+                        "$ref": "#/definitions/pve"
+                    },
+                    "loot": {
+                        "$ref": "#/definitions/loot"
+                    },
+                    "skin": {
+                        "$ref": "#/definitions/skin"
+                    },
+                    "herb": {
+                        "$ref": "#/definitions/herb"
+                    },
+                    "mine": {
+                        "$ref": "#/definitions/mine"
+                    },
+                    "treasure": {
+                        "$ref": "#/definitions/treasure"
+                    },
+                    "harvests": {
+                        "$ref": "#/definitions/harvests"
+                    },
+                    "death": {
+                        "$ref": "#/definitions/death"
+                    },
+                    "early_termination": {
+                        "$ref": "#/definitions/early_termination"
+                    },
+                    "name": {
+                        "description": "路线组的名称。",
+                        "type": "string"
+                    },
+                    "value": {
+                        "description": "路线组包含的常规路线。",
+                        "type": "array",
+                        "items": {
+                            "type": "string"
+                        }
+                    },
+                    "rendezvous": {
+                        "description": "路线组里所有路线共享的0号导航点，即集合点。",
+                        "$ref": "#/definitions/point"
+                    },
+                    "start_distance": {
+                        "description": "在开始路线导航前，要求角色必须位于集合点指定的范围码数之内。",
+                        "type": "number",
+                        "minimum": 0
+                    },
+                    "next_groups": {
+                        "description": "定义一组当前路线结束后，可以切换前往的其它路线组。\n注意：第一个满足条件的路线组会被作为下一个路线组。\n注意：如果没有任何路线组满足条件，则当前路线切换为当前路线组中剩余路线中的任一条。",
+                        "type": "array",
+                        "items": {
+                            "type": ["object", "null"],
+                            "required": ["name"],
+                            "properties": {
+                                "name": {
+                                    "description": "下一个路线组的名称。",
+                                    "type": "string"
+                                },
+                                "path": {
+                                    "description": "可以指定一条前往该下一个路线组的过渡路线，用于连接当前路线组的集合点和下一个路线组的集合点。",
+                                    "type": "string"
+                                },
+                                "conditions": {
+                                    "description": "可以指定切换到该下一个路线组所必须满足的条件。\n注意：如果不指定条件，则无条件进行路线组切换。",
+                                    "$ref": "#/definitions/conditions"
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}

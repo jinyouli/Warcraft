@@ -1,0 +1,12 @@
+﻿<p style="font-family: Verdana; font-size: 12px">Custom scripts can let you add custom condition variables and actions besides the system provided ones, in Lua. The script files will be loaded once when the project is loaded in game. In order to do that, each script file should return a table in the following format:</p>
+<code style="font-family: Consolas; font-size: 12px; color: blue; display: block; white-space: pre; line-height: 1.5em;">return {
+    actions = {
+        ["action1"] = function(env) return true end,
+        ["action2"] = function(env) return true end,
+    },
+    variables = {
+        ["variable1"] = function(env) return 1 end,
+        ["variable2"] = function(env) return 2 end,
+    },
+};</code>
+<p style="font-family: Verdana; font-size: 12px">Right click the node to add a new custom script.</p>
