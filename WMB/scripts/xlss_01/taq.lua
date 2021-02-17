@@ -8,13 +8,24 @@ function TAQHandle()
     AK.Dungeon.eyun_dead_point_start = {-4580.6342,1631.246,94.1163}
     AK.Dungeon.eyun_dead_point_real = {320.33,11.213,-9.30}
     AK.Dungeon.eyun_dead_point_enter = {-3957.44,1079.9622,161.1315}
+
+    AK.Dungeon.boss_path_index = 1
     AK.Dungeon.eyun_go_boss_path = {
       {254.9199,-19.4629,-2.5596},
       {278.2481,-22.6146,-2.5596},
       {311.8697,12.6752,-3.8855}
     }
 
-    AK.Dungeon.eyun_go_boss_path_one = {311.8697,12.6752,-3.8855}
+    AK.Dungeon.eyun_go_boss_path_up = {
+      {314.8999,11.6153,-1.5010},
+      {320.6407,11.5291,-1.6598}
+    }
+
+    AK.Dungeon.eyun_go_boss_path_one = {
+      {294.0,-16.486,-3.886},
+      {313.5101,11.5236,-4.8208},
+      {313.97134399414,-0.78615522,-5.1237}
+      }
 
     AK.Dungeon.dead_go_dungeon_path = {
       {-4565.48,1616.783,95.76},
@@ -69,19 +80,104 @@ function TAQHandle()
 
     AK.Dungeon.GoBossHandle = function(step,sendonry_step)
 
+
+
+      local targetX = AK.Dungeon.eyun_go_boss_path_one[2][1];
+      local targetY = AK.Dungeon.eyun_go_boss_path_one[2][2];
+      local targetZ = AK.Dungeon.eyun_go_boss_path_one[2][3];
+      local PlayerX, PlayerY, PlayerZ = ObjectPosition("Player");
+
       if AK.Dungeon.sendonry_step == "init" then 
-          AK.Me.SetDelayCount(20)
+          -- AK.Me.SetDelayCount(20)
           AK.API.MoveTo(264.9318237,-27.3486,-2.559)
           return "go_boss","step_point_1"
       elseif AK.Dungeon.sendonry_step == "step_point_1" then 
-          AK.Me.SetDelayCount(15)
+          -- AK.Me.SetDelayCount(15)
           AK.API.MoveTo(269.79,-24.99,-2.559)
           return "go_boss","step_point_2"
       elseif AK.Dungeon.sendonry_step == "step_point_2" then
         --监测周边怪物，准备去台子处
-      end 
+        
+        npcNum = wmbapi.GetNpcCount(PlayerX, PlayerY, PlayerZ, 50, 0)
+        local enemyNum = 0
+        local isPass = true
+        local distance = 100000000
 
-    end
+        for i=1,npcNum do
+          npc = wmbapi.GetNpcWithIndex(i)
+          isEnemy = UnitIsEnemy("player",npc)
+          if isEnemy == true then
+            enemyNum = enemyNum + 1
+
+              local x, y, z = wmbapi.ObjectPosition(npc)
+              flags = UnitMovementFlags(npc)
+              dis_player = GetDistanceBetweenPositions(x,y,z, PlayerX, PlayerY, PlayerZ)
+
+              if flags > 0 and dis_player < distance then
+                enemyNum = i
+                distance = dis_player
+              end
+
+              if GetDistanceBetweenPositions(x,y,z, targetX, targetY, targetZ) < 40 or dis_player < 40 then
+                isPass = false
+              end
+            end
+          end
+      
+        if isPass == false then
+          return "go_boss","step_point_2"
+        end
+
+        if enemyNum ~= 0 then
+          npc = wmbapi.GetNpcWithIndex(enemyNum)
+
+          local x, y, z = wmbapi.ObjectPosition(npc)
+          flags = UnitMovementFlags(npc)
+          isFace = ObjectIsFacing(npc, "player")
+          facing = wmbapi.ObjectFacing(npc)
+
+          if GetDistanceBetweenPositions(PlayerX,PlayerY,PlayerZ, x, y, z) < 30 or isFace or facing < 3.9 then
+            isPass = false
+          end
+
+          if isPass == true then
+            AK.Me.SetDelayCount(60)
+            AK.API.MoveTo(AK.Dungeon.eyun_go_boss_path_one[1][1],AK.Dungeon.eyun_go_boss_path_one[1][2],AK.Dungeon.eyun_go_boss_path_one[1][3])
+            C_Timer.After(3, function()
+            AK.API.MoveTo(AK.Dungeon.eyun_go_boss_path_one[3][1],AK.Dungeon.eyun_go_boss_path_one[3][2],AK.Dungeon.eyun_go_boss_path_one[3][3])
+            end)
+            return "go_boss","step_point_3"   
+          end
+        end
+       return "go_boss","step_point_2"
+     
+      elseif AK.Dungeon.sendonry_step == "step_point_3" then
+
+        if GetDistanceBetweenPositions(PlayerX,PlayerY,PlayerZ, targetX, targetY, targetZ) < 2 then
+          return "go_boss","step_point_4"
+        else
+          AK.API.MoveTo(targetX, targetY, targetZ)
+          return "go_boss","step_point_3"
+        end
+       
+      elseif AK.Dungeon.sendonry_step == "step_point_4" then
+        JumpOrAscendStart();
+        C_Timer.After(1, function()
+            JumpOrAscendStart();
+        end)
+
+       return "go_boss","step_point_5"
+      
+      elseif AK.Dungeon.sendonry_step == "step_point_5" then
+       print("第5步!!!!!!!!!!")
+       -- MoveForwardStart();
+       AK.API.MoveTo(314.8999,11.6153,-1.5010)
+       C_Timer.After(1, function()
+            JumpOrAscendStart();
+        end)
+      end
+    end 
+    
 
 
     AK.Dungeon.DeadHandle = function(step,sendonry_step)
